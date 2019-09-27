@@ -36,10 +36,9 @@ namespace Wabbajack
 
         public string MO2Profile;
 
-        public Compiler(string mo2_folder, Action<string> log_fn)
+        public Compiler(string mo2_folder)
         {
             MO2Folder = mo2_folder;
-            Log_Fn = log_fn;
             MO2Ini = Path.Combine(MO2Folder, "ModOrganizer.ini").LoadIniFile();
             GamePath = ((string) MO2Ini.General.gamePath).Replace("\\\\", "\\");
         }
@@ -67,25 +66,15 @@ namespace Wabbajack
 
         public string MO2ProfileDir => Path.Combine(MO2Folder, "profiles", MO2Profile);
 
-        public Action<string> Log_Fn { get; }
         public List<Directive> InstallDirectives { get; private set; }
+
+        private NexusApiClient _nexusApiClient;
         internal UserStatus User { get; private set; }
         public List<Archive> SelectedArchives { get; private set; }
         public List<RawSourceFile> AllFiles { get; private set; }
         public ModList ModList { get; private set; }
         public ConcurrentBag<Directive> ExtraFiles { get; private set; }
         public Dictionary<string, dynamic> ModInis { get; private set; }
-
-        private NexusApiClient _nexusApiClient;
-        private NexusApiClient NexusApiClient {
-            get
-            {
-                if (_nexusApiClient == null)
-                    _nexusApiClient = new NexusApiClient();
-
-                return _nexusApiClient;
-            }
-        }
 
         public VirtualFileSystem VFS => VirtualFileSystem.VFS;
 
@@ -94,26 +83,19 @@ namespace Wabbajack
 
         public HashSet<string> SelectedProfiles { get; set; } = new HashSet<string>();
 
-        public void Info(string msg, params object[] args)
+        public void Info(string msg)
         {
-            if (args.Length > 0)
-                msg = string.Format(msg, args);
-            Log_Fn(msg);
+            Utils.Log(msg);
         }
 
-        public void Status(string msg, params object[] args)
+        public void Status(string msg)
         {
-            if (args.Length > 0)
-                msg = string.Format(msg, args);
             WorkQueue.Report(msg, 0);
         }
 
-
-        private void Error(string msg, params object[] args)
+        private void Error(string msg)
         {
-            if (args.Length > 0)
-                msg = string.Format(msg, args);
-            Log_Fn(msg);
+            Utils.Log(msg);
             throw new Exception(msg);
         }
 
@@ -197,7 +179,7 @@ namespace Wabbajack
                 .DistinctBy(f => f.Path)
                 .ToList();
 
-            Info("Found {0} files to build into mod list", AllFiles.Count);
+            Info($"Found {AllFiles.Count} files to build into mod list");
 
             ExtraFiles = new ConcurrentBag<Directive>();
 
@@ -224,9 +206,9 @@ namespace Wabbajack
             results = results.Concat(ExtraFiles).ToList();
 
             var nomatch = results.OfType<NoMatch>();
-            Info("No match for {0} files", nomatch.Count());
+            Info($"No match for {nomatch.Count()} files");
             foreach (var file in nomatch)
-                Info("     {0}", file.To);
+                Info($"     {file.To}");
             if (nomatch.Count() > 0)
             {
                 if (IgnoreMissingFiles)
@@ -246,8 +228,8 @@ namespace Wabbajack
 
             if (IndexedArchives.Any(a => a.IniData?.General?.gameName != null))
             {
-                var nexusClient = new NexusApiClient();
-                if (!nexusClient.IsPremium) Info($"User {nexusClient.Username} is not a premium Nexus user, cannot continue");
+                _nexusApiClient = new NexusApiClient();
+                if (!_nexusApiClient.IsPremium) Info($"User {_nexusApiClient.Username} is not a premium Nexus user, cannot continue");
 
             }
 
@@ -264,14 +246,32 @@ namespace Wabbajack
             };
 
             GenerateReport();
-            PatchExecutable();
+            ExportModlist();
 
             ResetMembers();
 
             ShowReport();
 
-            Info("Done Building Modpack");
+            Info("Done Building Modlist");
             return true;
+        }
+
+        private void ExportModlist()
+        {
+            var out_path = MO2Profile + ".modlist";
+
+            Utils.Log($"Exporting Modlist to : {out_path}");
+
+            using (var os = File.OpenWrite(out_path))
+            using (var bw = new BinaryWriter(os))
+            {
+                var formatter = new BinaryFormatter();
+                using (var compressed = LZ4Stream.Encode(bw.BaseStream,
+                    new LZ4EncoderSettings { CompressionLevel = LZ4Level.L10_OPT }, true))
+                {
+                    formatter.Serialize(compressed, ModList);
+                }
+            }
         }
 
         private void ShowReport()
@@ -330,7 +330,7 @@ namespace Wabbajack
                 .GroupBy(p => p.ArchiveHashPath[0])
                 .ToList();
 
-            Info("Patching building patches from {0} archives", groups.Count);
+            Info($"Patching building patches from {groups.Count} archives");
             var absolute_paths = AllFiles.ToDictionary(e => e.Path, e => e.AbsolutePath);
             groups.PMap(group => BuildArchivePatches(group.Key, group, absolute_paths));
 
@@ -349,7 +349,7 @@ namespace Wabbajack
                 // Now Create the patches
                 group.PMap(entry =>
                 {
-                    Info("Patching {0}", entry.To);
+                    Info($"Patching {entry.To}");
                     using (var origin = by_path[string.Join("|", entry.ArchiveHashPath.Skip(1))].OpenRead())
                     using (var output = new MemoryStream())
                     {
@@ -404,14 +404,10 @@ namespace Wabbajack
             if (archives.TryGetValue(sha, out var found))
             {
                 if (found.IniData == null)
-                    Error(
-                        "No download metadata found for {0}, please use MO2 to query info or add a .meta file and try again.",
-                        found.Name);
+                    Error($"No download metadata found for {found.Name}, please use MO2 to query info or add a .meta file and try again.");
                 var general = found.IniData.General;
                 if (general == null)
-                    Error(
-                        "No General section in mod metadata found for {0}, please use MO2 to query info or add the info and try again.",
-                        found.Name);
+                    Error($"No General section in mod metadata found for {found.Name}, please use MO2 to query info or add the info and try again.");
 
                 Archive result;
 
@@ -509,7 +505,7 @@ namespace Wabbajack
                 }
                 else
                 {
-                    Error("No way to handle archive {0} but it's required by the modlist", found.Name);
+                    Error($"No way to handle archive {found.Name} but it's required by the modlist");
                     return null;
                 }
 
@@ -522,7 +518,7 @@ namespace Wabbajack
 
                 Info($"Checking link for {found.Name}");
 
-                var installer = new Installer(null, "", Utils.Log);
+                var installer = new Installer(null, "");
                 if (!installer.DownloadArchive(result, false))
                     Error(
                         $"Unable to resolve link for {found.Name}. If this is hosted on the Nexus the file may have been removed.");
@@ -530,14 +526,14 @@ namespace Wabbajack
                 return result;
             }
 
-            Error("No match found for Archive sha: {0} this shouldn't happen", sha);
+            Error($"No match found for Archive sha: {sha} this shouldn't happen");
             return null;
         }
 
 
         private Directive RunStack(IEnumerable<Func<RawSourceFile, Directive>> stack, RawSourceFile source)
         {
-            Status("Compiling {0}", source.Path);
+            Status($"Compiling {source.Path}");
             foreach (var f in stack)
             {
                 var result = f(source);
@@ -590,7 +586,7 @@ namespace Wabbajack
                 // If we have no match at this point for a game folder file, skip them, we can't do anything about them
                 IgnoreGameFiles(),
 
-                // There are some types of files that will error the compilation, because tehy're created on-the-fly via tools
+                // There are some types of files that will error the compilation, because they're created on-the-fly via tools
                 // so if we don't have a match by this point, just drop them.
                 IgnoreEndsWith(".ini"),
                 IgnoreEndsWith(".html"),
@@ -1155,22 +1151,13 @@ namespace Wabbajack
             var settings = new JsonSerializerSettings {TypeNameHandling = TypeNameHandling.Auto};
             var executable = Assembly.GetExecutingAssembly().Location;
             var out_path = Path.Combine(Path.GetDirectoryName(executable), MO2Profile + ".exe");
-            Info("Patching Executable {0}", Path.GetFileName(out_path));
+            Info($"Patching Executable {Path.GetFileName(out_path)}");
             File.Copy(executable, out_path, true);
             using (var os = File.OpenWrite(out_path))
             using (var bw = new BinaryWriter(os))
             {
                 var orig_pos = os.Length;
                 os.Position = os.Length;
-                //using (var compressor = new BZip2OutputStream(bw.BaseStream))
-                /*using (var sw = new StreamWriter(compressor))
-                using (var writer = new JsonTextWriter(sw))
-                {
-                    var serializer = new JsonSerializer();
-                    serializer.TypeNameHandling = TypeNameHandling.Auto;
-                    serializer.Serialize(writer, ModList);
-                }*/
-                //bw.Write(data);
                 var formatter = new BinaryFormatter();
 
                 using (var compressed = LZ4Stream.Encode(bw.BaseStream,
