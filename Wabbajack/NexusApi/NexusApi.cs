@@ -85,14 +85,14 @@ namespace Wabbajack.NexusApi
 
         #region Rate Tracking
 
-        private readonly object RemainingLock = new object();
+        private readonly object _remainingLock = new object();
 
         private int _dailyRemaining;
         public int DailyRemaining
         {
             get
             {
-                lock (RemainingLock)
+                lock (_remainingLock)
                 {
                     return _dailyRemaining;
                 }
@@ -104,7 +104,7 @@ namespace Wabbajack.NexusApi
         {
             get
             {
-                lock (RemainingLock)
+                lock (_remainingLock)
                 {
                     return _hourlyRemaining;
                 }
@@ -114,13 +114,15 @@ namespace Wabbajack.NexusApi
 
         private void UpdateRemaining(HttpResponseMessage response)
         {
+            // TODO: Don't break if the header fields are absent (in case of errors).
+
             int dailyRemaining = int.Parse(response.Headers.GetValues("x-rl-daily-remaining").First());
             int hourlyRemaining = int.Parse(response.Headers.GetValues("x-rl-hourly-remaining").First());
 
-            lock (RemainingLock)
+            lock (_remainingLock)
             {
-                _dailyRemaining = Math.Min(dailyRemaining, hourlyRemaining);
-                _hourlyRemaining = Math.Min(dailyRemaining, hourlyRemaining);
+                _dailyRemaining = Math.Min(_dailyRemaining, dailyRemaining);
+                _hourlyRemaining = Math.Min(_hourlyRemaining, hourlyRemaining);
 
                 OnPropertyChanged(nameof(DailyRemaining));
                 OnPropertyChanged(nameof(HourlyRemaining));
@@ -151,10 +153,16 @@ namespace Wabbajack.NexusApi
             Task<HttpResponseMessage> responseTask = _httpClient.GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
             responseTask.Wait();
 
+            // TODO: Ensure we got a 200 response.
+            // TODO: Handle 419 responses by backing off and informing the user.
+
             var response = responseTask.Result;
             UpdateRemaining(response);
 
-            using (var stream = _httpClient.GetStreamSync(url))
+            var streamTask = response.Content.ReadAsStreamAsync();
+            streamTask.Wait();
+
+            using (var stream = streamTask.Result)
             {
                 return stream.FromJSON<T>();
             }
