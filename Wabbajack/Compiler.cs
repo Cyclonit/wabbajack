@@ -482,7 +482,7 @@ namespace Wabbajack
                         ModID = general.modID,
                         Version = general.version ?? "0.0.0.0"
                     };
-                    var info = NexusApiClient.GetModInfo(nm);
+                    var info = new NexusApiClient().GetModInfo(nm);
                     nm.Author = info.author;
                     nm.UploadedBy = info.uploaded_by;
                     nm.UploaderProfile = info.uploaded_users_profile_url;
