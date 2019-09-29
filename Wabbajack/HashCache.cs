@@ -12,17 +12,17 @@ namespace Wabbajack
         private HashCache() { }
 
 
-        private string ComputeDigest(string archivePath)
+        private string ComputeDigest(string filePath)
         {
-            var fileName = Path.GetFileName(archivePath);
+            var fileName = Path.GetFileName(filePath);
             Utils.Status($"Hashing {fileName}");
 
             var sha = new SHA256Managed();
             using (var o = new CryptoStream(Stream.Null, sha, CryptoStreamMode.Write))
             {
-                using (var i = File.OpenRead(archivePath))
+                using (var i = File.OpenRead(filePath))
                 {
-                    i.CopyToWithStatus(new FileInfo(archivePath).Length, o, $"Hashing {fileName}");
+                    i.CopyToWithStatus(new FileInfo(filePath).Length, o, $"Hashing {fileName}");
                 }
             }
 

@@ -249,7 +249,7 @@ namespace Wabbajack
             if (Directory.Exists(bsa_dir))
             {
                 Info($"Removing temp folder {Consts.BSACreationDir}");
-                VirtualFileSystem.DeleteDirectory(bsa_dir);
+                VirtualFileSystem.VFS.DeleteDirectory(bsa_dir);
             }
         }
 
