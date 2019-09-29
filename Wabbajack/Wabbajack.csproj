@@ -181,6 +181,8 @@
       <SubType>Designer</SubType>
     </ApplicationDefinition>
     <Compile Include="Data.cs" />
+    <Compile Include="Downloader.cs" />
+    <Compile Include="HashCache.cs" />
     <Compile Include="LambdaCommand.cs" />
     <Compile Include="NexusApi\Dtos.cs" />
     <Compile Include="NexusApi\NexusApiUtils.cs" />

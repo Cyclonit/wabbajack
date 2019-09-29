@@ -104,7 +104,6 @@ namespace Wabbajack.Test
         private void Install(Compiler compiler)
         {
             var installer = new Installer(compiler.ModList, utils.InstallFolder);
-            installer.DownloadFolder = utils.DownloadsFolder;
             installer.GameFolder = utils.GameFolder;
             installer.Install();
         }

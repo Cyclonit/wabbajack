@@ -45,26 +45,7 @@ namespace Wabbajack.Common
         {
             _statusFn?.Invoke(msg, progress);
         }
-
-
-        /// <summary>
-        ///     MurMur3 hashes the file pointed to by this string
-        /// </summary>
-        /// <param name="file"></param>
-        /// <returns></returns>
-        public static string FileSHA256(this string file)
-        {
-            var sha = new SHA256Managed();
-            using (var o = new CryptoStream(Stream.Null, sha, CryptoStreamMode.Write))
-            {
-                using (var i = File.OpenRead(file))
-                {
-                    i.CopyToWithStatus(new FileInfo(file).Length, o, $"Hashing {Path.GetFileName(file)}");
-                }
-            }
-
-            return sha.Hash.ToBase64();
-        }
+        
 
         public static void CopyToWithStatus(this Stream istream, long maxSize, Stream ostream, string status)
         {

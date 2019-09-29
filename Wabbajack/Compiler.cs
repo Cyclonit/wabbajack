@@ -74,17 +74,6 @@ namespace Wabbajack
         public ConcurrentBag<Directive> ExtraFiles { get; private set; }
         public Dictionary<string, dynamic> ModInis { get; private set; }
 
-        private NexusApiClient _nexusApiClient;
-        private NexusApiClient NexusApiClient {
-            get
-            {
-                if (_nexusApiClient == null)
-                    _nexusApiClient = new NexusApiClient();
-
-                return _nexusApiClient;
-            }
-        }
-
         public VirtualFileSystem VFS => VirtualFileSystem.VFS;
 
         public List<IndexedArchive> IndexedArchives { get; private set; }
@@ -527,12 +516,9 @@ namespace Wabbajack
 
                 Info($"Checking link for {found.Name}");
 
-                var installer = new Installer(null, "");
-                installer.NexusClient = NexusApiClient;
-
-                if (!installer.DownloadArchive(result, false))
-                    Error(
-                        $"Unable to resolve link for {found.Name}. If this is hosted on the Nexus the file may have been removed.");
+                var downloader = new Downloader("");
+                if (!downloader.TestArchive(result))
+                    Error($"Unable to resolve link for {found.Name}. The file may have been removed.");
 
                 return result;
             }

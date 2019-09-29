@@ -4,10 +4,10 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Reflection;
-using System.Runtime.CompilerServices;
 using Compression.BSA;
 using ICSharpCode.SharpZipLib.Zip;
 using Newtonsoft.Json;
+using Wabbajack;
 using Wabbajack.Common;
 using Directory = Alphaleonis.Win32.Filesystem.Directory;
 using File = Alphaleonis.Win32.Filesystem.File;
@@ -673,7 +673,7 @@ namespace VFS
 
             var fio = new FileInfo(StagedPath);
             Size = fio.Length;
-            Hash = StagedPath.FileSHA256();
+            Hash = HashCache.Instance.GetFileHash(StagedPath);
             LastModified = fio.LastWriteTime.ToMilliseconds();
         }
 

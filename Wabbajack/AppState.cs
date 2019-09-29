@@ -483,7 +483,6 @@ namespace Wabbajack
             {
                 var installer = new Installer(_modList, Location);
 
-                installer.DownloadFolder = DownloadLocation;
                 var th = new Thread(() =>
                 {
                     UIReady = false;
